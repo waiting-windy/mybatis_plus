@@ -3,6 +3,7 @@ import	java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ze.mybatis_plus_chapter1.mapper.UserMapper;
 import com.ze.mybatis_plus_chapter1.pojo.User;
@@ -92,6 +93,14 @@ class MybatisPlusChapter1ApplicationTests {
     @Test
     void testDeleteById() {
         mapper.deleteById(11);
+    }
+
+    @Test
+    void testWrapper() {
+        //查询name不为空的用户，并且邮箱不为空的用户，年龄大于等于12
+        QueryWrapper<User> wrapper = new QueryWrapper<>();
+        wrapper.isNotNull("name").isNotNull("email").ge("age", 12);
+        mapper.selectList(wrapper).forEach(System.out::println);
     }
 
 }
