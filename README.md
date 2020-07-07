@@ -134,7 +134,7 @@ Parameters: 1279295724784742402(Long), lizeyu(String), 22(Integer), 964879015@qq
 
 >第一位为未使用，接下来的41位为毫秒级时间(41位的长度可以使用69年)，然后是5位datacenterId和5位workerId(10位的长度最多支持部署1024个节点） ，最后12位是毫秒内的计数（12位的计数顺序号支持每个节点每毫秒产生4096个ID序号）一共加起来刚好64位，为一个Long型。(转换成字符串后长度最多19)。
 >
-> snowflake生成的ID整体上按照时间自增排序，并且整个分布式系统内不会产生ID碰撞（由datacenter和workerId作区分），并且效率较高。经测试snowflake每秒能够产生26万个ID。
+>snowflake生成的ID整体上按照时间自增排序，并且整个分布式系统内不会产生ID碰撞（由datacenter和workerId作区分），并且效率较高。经测试snowflake每秒能够产生26万个ID。
 
 ###   更新操作
 
@@ -148,6 +148,7 @@ Parameters: 1279295724784742402(Long), lizeyu(String), 22(Integer), 964879015@qq
 
 ==>  Preparing: UPDATE user SET name=?, age=?, email=? WHERE id=? 
 ==> Parameters: liziwei(String), 22(Integer), 964879015@qq.com(String), 6(Long)
+
 ```
 
 ### 自动填充
@@ -163,6 +164,7 @@ Parameters: 1279295724784742402(Long), lizeyu(String), 22(Integer), 964879015@qq
     private Date createTime;
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
+
 ```
 
 2. 编写处理器来处理这个注解
@@ -184,6 +186,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         this.setFieldValByName("updateTime", new Date(), metaObject);
     }
 }
+
 ```
 
 3. 测试
@@ -201,6 +204,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         user.setId(11L).setName("liziwei").setAge(22).setEmail("964879015@qq.com");
         mapper.updateById(user);
     }
+
 ```
 
 ![1594000038073](C:\Users\96487\AppData\Roaming\Typora\typora-user-images\1594000038073.png)
@@ -227,6 +231,7 @@ where id = 2 and version = 1
 -- B 线程抢先完成，这个时候 version = 2，会导致A修改失败！
 update user set name = “kuangshen”,version = version+1
 where id = 2 and version = 1
+
 ```
 
 > 测试一下MP的乐观锁插件
@@ -238,6 +243,7 @@ where id = 2 and version = 1
 ```java
     @Version
     private Integer version;
+
 ```
 
 3.注册一个拦截器
@@ -252,6 +258,7 @@ public class MyBatisPlusConfig {
         return new OptimisticLockerInterceptor();
     }
 }
+
 ```
 
 4.测试乐观锁
@@ -273,6 +280,7 @@ public class MyBatisPlusConfig {
 
         mapper.updateById(user);//如果没有乐观锁就会覆盖插队线程的值
     }
+
 ```
 
 ![1594019556195](C:\Users\96487\AppData\Roaming\Typora\typora-user-images\1594019556195.png)
@@ -299,6 +307,7 @@ public class MyBatisPlusConfig {
         map.put("name", "lizeyu");
         mapper.selectByMap(map).forEach(user -> System.out.println(user));
     }
+
 ```
 
 ### 分页查询
@@ -325,6 +334,7 @@ public class MyBatisPlusConfig {
         paginationInterceptor.setCountSqlParser(new JsqlParserCountOptimize(true));
         return paginationInterceptor;
     }
+
 ```
 
 
@@ -339,6 +349,7 @@ public class MyBatisPlusConfig {
         mapper.selectPage(page, null).getRecords().forEach(System.out::println);
 
     }
+
 ```
 
 ### 逻辑删除
@@ -352,6 +363,7 @@ public class MyBatisPlusConfig {
 ```java
     @TableLogic
     private Integer isDeleted;
+
 ```
 
 3、配置文件配置删除字段值
@@ -362,6 +374,7 @@ mybatis-plus:
     db-config:
       logic-delete-value: 1
       logic-not-delete-value: 0
+
 ```
 
 ![1594023772397](C:\Users\96487\AppData\Roaming\Typora\typora-user-images\1594023772397.png)
@@ -370,13 +383,81 @@ mybatis-plus:
 
 被删除字段没有真的删除，而是逻辑删除字段变为1。再次查询时不存在，MP自动为我们查询时加入了id_deleted=0字段
 
-## 4. 性能分析插件
+## 4. 条件构造器
 
-我们在平时的开发中，会遇到一些慢sql，如果超过一定时间就停止运行。
+```java
+@Test
+void testWrapper() {
+    //查询name不为空的用户，并且邮箱不为空的用户，年龄大于等于12
+    QueryWrapper<User> wrapper = new QueryWrapper<>();
+    wrapper.isNotNull("name").isNotNull("email").ge("age", 12);
+    mapper.selectList(wrapper).forEach(System.out::println);
+}
 
+```
 
+## 5. 代码自动生成器
 
-## 5. 条件构造器
+ AutoGenerator 是 MyBatis-Plus 的代码生成器，通过 AutoGenerator 可以快速生成 Entity、Mapper、Mapper XML、Service、Controller 等各个模块的代码，极大的提升了开发效率。 
 
-## 6. 代码自动生成器
+```java
+public static void main(String[] args) {
+
+    //需要构建一个代码自动生成器对象
+    AutoGenerator generator = new AutoGenerator();
+    //配置策略
+
+    //1、全局策略
+    GlobalConfig gc = new GlobalConfig();
+    String projectPath = System.getProperty("user.dir");
+    gc.setOutputDir(projectPath + "/src/main/java");
+    gc.setAuthor("lizeyu");
+    gc.setServiceName("%sService");
+    gc.setFileOverride(false);
+    gc.setSwagger2(true);
+    generator.setGlobalConfig(gc);
+
+    //2、设置数据源
+    DataSourceConfig dsc = new DataSourceConfig();
+    dsc.setUrl("jdbc:mysql://localhost:3306/mybatis?useSSl=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC");
+    dsc.setDriverName("com.mysql.cj.jdbc.Driver");
+    dsc.setUsername("root");
+    dsc.setPassword("111111");
+    dsc.setDbType(DbType.MYSQL);
+    generator.setDataSource(dsc);
+
+    //3、包的设置
+    PackageConfig pc = new PackageConfig();
+    pc.setModuleName("blog");
+    pc.setParent("com.ze");
+    pc.setEntity("entity");
+    pc.setMapper("mapper");
+    pc.setService("service");
+    pc.setController("controller");
+    generator.setPackageInfo(pc);
+
+    //4、策略配置
+    StrategyConfig strategyConfig = new StrategyConfig();
+    strategyConfig.setInclude("user");
+    strategyConfig.setNaming(NamingStrategy.underline_to_camel);
+    strategyConfig.setColumnNaming(NamingStrategy.underline_to_camel);
+    strategyConfig.setSuperEntityClass("父类实体");
+    strategyConfig.setEntityLombokModel(true);
+    strategyConfig.setRestControllerStyle(true);
+    strategyConfig.setLogicDeleteFieldName("isDeleted");
+    TableFill createTime = new TableFill("create_time", FieldFill.INSERT);
+    TableFill updateTime = new TableFill("update_time", FieldFill.INSERT_UPDATE);
+    ArrayList<TableFill> tableFills = new ArrayList<>();
+    tableFills.add(createTime);
+    tableFills.add(updateTime);
+    strategyConfig.setTableFillList(tableFills);
+    strategyConfig.setVersionFieldName("version");
+    strategyConfig.setControllerMappingHyphenStyle(true);
+    generator.setStrategy(strategyConfig);
+
+    generator.execute();
+
+}
+
+```
 
